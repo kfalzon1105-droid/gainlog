@@ -1,1 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="GAINLOG"/>
+<meta name="theme-color" content="#0d0d0d"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<title>GAINLOG</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Grotesk:wght@400;600;700&display=swap"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#0d0d0d;color:#e8e8e8;font-family:"DM Mono",monospace;overscroll-behavior:none}
+body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:#111}::-webkit-scrollbar-thumb{background:#2a2a2a}
+input,select,textarea{background:#161616;border:1px solid #2a2a2a;color:#e8e8e8;border-radius:8px;padding:10px 12px;font-family:"DM Mono",monospace;font-size:14px;outline:none;transition:border-color .2s;width:100%}
+input:focus,select:focus,textarea:focus{border-color:#555}
+input::placeholder,textarea::placeholder{color:#3a3a3a}
+button{cursor:pointer;font-family:"DM Mono",monospace;transition:all .15s}
+select option{background:#161616}
+details summary::-webkit-details-marker{display:none}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+#header{flex-shrink:0;background:#0f0f0f;border-bottom:1px solid #1a1a1a;padding:12px 18px;display:flex;align-items:center;justify-content:space-between}
+#tabs{flex-shrink:0;display:flex;border-bottom:1px solid #1a1a1a;background:#0a0a0a}
+#content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.tab-btn{flex:1;padding:12px 0;font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;background:none;border:none;border-bottom:2px solid transparent;color:#3a3a3a}
+.inner{max-width:600px;margin:0 auto;padding:16px 14px 90px}
+.lbl{font-size:10px;color:#555;letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:5px}
+.btn-primary{width:100%;padding:14px;border:none;border-radius:10px;font-weight:700;font-size:14px}
+.icon-btn{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:6px;color:#888;font-size:13px;padding:5px 9px;cursor:pointer}
+.day-strip{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;margin-bottom:16px}
+.day-strip::-webkit-scrollbar{display:none}
+.day-chip{flex:0 0 auto;min-width:52px;padding:8px 4px;border-radius:10px;font-size:10px;text-align:center;cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:400;overflow-y:auto;padding:16px}
+.modal{max-width:560px;margin:0 auto;background:#0f0f0f;border:1px solid #222;border-radius:16px;overflow:hidden}
+.note-bar{font-size:12px;color:#5a5a5a;line-height:1.6;padding:10px 12px;background:#111;border-radius:8px;border-left:3px solid #333;margin-bottom:12px}
+.olbar{padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div>
+      <div id="hdr-title" style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;letter-spacing:-.5px;color:#c8f060;transition:color .3s">GAINLOG</div>
+      <div style="font-size:10px;color:#3a3a3a;margin-top:1px;letter-spacing:.08em">HYBRID MASS MAINTENANCE PROTOCOL</div>
+    </div>
+    <div id="hdr-right" style="text-align:right;font-size:11px;color:#444"></div>
+  </div>
+  <div id="tabs">
+    <button class="tab-btn" data-tab="today" onclick="switchTab('today')">Today</button>
+    <button class="tab-btn" data-tab="schedule" onclick="switchTab('schedule')">Schedule</button>
+    <button class="tab-btn" data-tab="history" onclick="switchTab('history')">History</button>
+    <button class="tab-btn" data-tab="advice" onclick="switchTab('advice')">Advice</button>
+  </div>
+  <div id="content">
+    <div class="inner" id="tab-today"></div>
+    <div class="inner" id="tab-schedule" style="display:none"></div>
+    <div class="inner" id="tab-history" style="display:none"></div>
+    <div class="inner" id="tab-advice" style="display:none"></div>
+  </div>
+</div>
+<div id="toast-el" style="display:none;position:fixed;z-index:500;bottom:calc(80px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);padding:11px 20px;border-radius:10px;font-size:13px;white-space:nowrap;box-shadow:0 8px 40px rgba(0,0,0,.7)"></div>
+<div id="modal-root"></div>
+<script>
 
+// ── DATA ─────────────────────────────────────────────────────────────────────
+const SK='gainlog_pwa_v2', SCH='gainlog_pwa_sch_v2';
+const DS={
+  1:{label:"Heavy Lower Body",tag:"Barbell & Bench",type:"gym",emoji:"🦵",focus:"Mechanical tension and heavy leg development.",
+    warmup:["Hip circles 10 each dir","Leg swings 15 each side","Bodyweight squats 15 reps","Cat-cow 10 reps","Glute bridges 15 reps","Deadlift ramp: 40%x5 / 60%x3 / 75%x2"],
+    exercises:[
+      {name:"Barbell Deadlift",sets:4,reps:"5–8",note:"Keep the bar close to your shins and control the plates on the way down.",overloadTip:"Add 5 lbs when you hit 8 clean reps for 3 of 4 sets. Never round the lower back."},
+      {name:"Landmine Squat",sets:4,reps:"8–10",note:"Hold the loaded end at chest height. Keep torso upright.",overloadTip:"Add a plate when you can complete all 4 sets at 10 reps with a controlled tempo."},
+      {name:"Leg Extension",sets:3,reps:"10–12",note:"Squeeze quads hard at the top. Pause 1 second before lowering.",overloadTip:"Increase weight by the smallest increment when you hit 12 reps on all 3 sets."},
+      {name:"Standing Leg Curl",sets:3,reps:"10–12",note:"Isolate one leg at a time. Pull heel toward glute, control the return.",overloadTip:"Progress weight once you complete 12 reps per leg with no hip compensation."}
+    ]},
+  2:{label:"Rest / Active Recovery",tag:"Commute Day",type:"rest",emoji:"🚇",focus:"Light walking, stretching. No structured training.",warmup:[],exercises:[]},
+  3:{label:"Upper Body & Core",tag:"Reformer",type:"reformer",emoji:"🌊",focus:"Deep core stabilization and constant tension.",
+    warmup:["Breathwork 5 cycles","Supine spinal twist 20s each","Thoracic rotation 10 each","Scapular retraction 10 reps","Chin-to-chest curl 5 reps slow"],
+    exercises:[
+      {name:"The Hundred",sets:1,reps:"100 pumps",spring:"Medium",note:"Keep the lower back anchored. Pump arms vigorously with the breath.",overloadTip:"Lower legs closer to the floor (longer lever) before considering heavier springs."},
+      {name:"Supine Arm Pulls — Straight",sets:3,reps:"12–15",spring:"Medium",note:"Pull straps to hips. Use a 3-second slow return on every rep.",overloadTip:"Add half a spring when you maintain the slow 3s return for all 15 reps across 3 sets."},
+      {name:"Supine Arm Pulls — T-Press",sets:3,reps:"12–15",spring:"Medium",note:"Slight bend in elbows. Open wide and squeeze to close — chest flies.",overloadTip:"Increase spring when the squeeze at the top feels effortless for all sets."},
+      {name:"Kneeling Ab Crunches",sets:3,reps:"15–20",spring:"Light/Medium",note:"Exhale forcefully and round the spine as you pull the carriage in.",overloadTip:"Progress to medium springs when you hit 20 reps without losing the spinal curve."},
+      {name:"Long Stretch — Plank",sets:3,reps:"45 sec",spring:"Heavy",note:"Press out into a perfectly rigid plank. No hip sag, no breath holding.",overloadTip:"Extend hold to 60s before increasing spring. Quality over duration."}
+    ]},
+  4:{label:"Rest / Active Recovery",tag:"Commute Day",type:"rest",emoji:"🚇",focus:"Light walking, stretching. No structured training.",warmup:[],exercises:[]},
+  5:{label:"Heavy Upper Body",tag:"Barbell, EZ Bar & Attachments",type:"gym",emoji:"💪",focus:"Chest, back, and arm mass preservation.",
+    warmup:["Arm circles 30s each dir","Band pull-aparts 15 reps","Push-ups 10 reps","Shoulder rolls 20 reps","Bench ramp: 40%x8 / 60%x5 / 75%x3"],
+    exercises:[
+      {name:"Barbell Bench Press",sets:4,reps:"8–10",note:"Rack the bar on the bench uprights. Keep feet planted and arch natural.",overloadTip:"Add 2.5 lbs per side when you hit 10 reps on all 4 sets with controlled descent."},
+      {name:"Lat Pulldown",sets:4,reps:"8–10",note:"Pull bar to upper chest. Squeeze shoulder blades down, not just back.",overloadTip:"Increase weight when you can complete 10 reps without any momentum or body swing."},
+      {name:"Barbell Bent-Over Row",sets:4,reps:"8–10",note:"Pull bar from floor to belly button. Hinge 45 deg, flat back.",overloadTip:"Add 5 lbs when bar path is consistent and you feel it purely in the lats and mid-back."},
+      {name:"EZ Bar Front Raise",sets:3,reps:"10–12",note:"Lift to eye level. Slight bend in elbows. No swinging.",overloadTip:"Progress when you complete 12 slow reps with no trunk lean on all 3 sets."},
+      {name:"EZ Bar Curl SS",sets:3,reps:"10–12",note:"Perform curls immediately into skull crushers. 90s rest after both.",overloadTip:"Only increase weight when both moves in the superset feel fully controlled."},
+      {name:"EZ Bar Skull Crusher",sets:3,reps:"10–12",note:"Keep elbows pointed straight up. Lower bar to forehead under control.",overloadTip:"Part of the superset above. Prioritize elbow safety — never rush this movement."}
+    ]},
+  6:{label:"Lower Body Burnout & Mobility",tag:"Reformer",type:"reformer",emoji:"🔥",focus:"Flushing the legs, targeting stabilizers, and hip mobility.",
+    warmup:["Hip circles 10 each dir","Pelvic tilts 10 reps","Knee-to-chest stretch 30s each","Ankle circles 10 each dir","Clamshells 15 each side"],
+    exercises:[
+      {name:"Footwork — V & Parallel",sets:3,reps:"15",spring:"Heavy",note:"Push to near failure. Control the carriage completely on the way back in.",overloadTip:"Add half a spring when 15 reps feels like less than 80% effort on the last set."},
+      {name:"Single-Leg Press",sets:3,reps:"10/leg",spring:"Medium/Heavy",note:"Keep your pelvis level to force deep glute stabilizers to engage.",overloadTip:"Increase spring once pelvis stays perfectly level for all 10 reps each side."},
+      {name:"Feet in Straps — Leg Circles",sets:2,reps:"10/direction",spring:"Medium",note:"Active recovery. Keep the tailbone heavy on the mat.",overloadTip:"Progression is range of motion, not spring load. Aim for larger, controlled circles."},
+      {name:"Eve's Lunge",sets:2,reps:"10/leg",spring:"Light",note:"One knee on carriage, one foot on floor. Press back for a deep hip flexor stretch.",overloadTip:"This is a mobility exercise. Deepen the stretch range before adding spring."},
+      {name:"Mermaid Stretch",sets:1,reps:"3/side",spring:"Light",note:"Push the footbar away to stretch obliques and decompress the spine.",overloadTip:"Prioritize range of lateral flexion. Go slow and breathe into the stretch."}
+    ]},
+  0:{label:"Rest / Active Recovery",tag:"Sunday",type:"rest",emoji:"😴",focus:"Full rest. Sleep, walk, foam roll.",warmup:[],exercises:[]}
+};
+
+const SPRINGS=["Light","Light/Medium","Medium","Medium/Heavy","Heavy"];
+const SPRV={"Light":1,"Light/Medium":1.5,"Medium":2,"Medium/Heavy":2.5,"Heavy":3};
+const DN=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const EMOJIS=["🦵","💪","🌊","🔥","🏋️","🧘","😴","🚇","⚡","🎯"];
+
+let logs=JSON.parse(localStorage.getItem(SK)||'[]');
+let sched=JSON.parse(localStorage.getItem(SCH)||'null')||JSON.parse(JSON.stringify(DS));
+let tab='today',selDay=new Date().getDay(),actSets={},actNotes={},doneEx={},expEx=null,histFil='all';
+
+function save(){localStorage.setItem(SK,JSON.stringify(logs));localStorage.setItem(SCH,JSON.stringify(sched));}
+function ac(t){return t==='reformer'?'#a0c8f0':t==='rest'?'#777':'#c8f060';}
+function adb(t){return t==='reformer'?'#0a1020':t==='rest'?'#111':'#0a1a04';}
+function abb(t){return t==='reformer'?'#2a4a70':t==='rest'?'#333':'#2a4a10';}
+function cn(n){return n.replace(/ SS$/,'').replace(/ ⚡.*/,'');}
+
+function toast(msg,err){
+  const d=sched[selDay],e=document.getElementById('toast-el');
+  e.textContent=msg;
+  e.style.cssText='display:block;position:fixed;z-index:500;bottom:calc(80px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);padding:11px 20px;border-radius:10px;font-size:13px;white-space:nowrap;box-shadow:0 8px 40px rgba(0,0,0,.7);font-family:"DM Mono",monospace;'
+    +'background:'+(err?'#1e0808':adb(d.type))+';border:1px solid '+(err?'#4a1010':abb(d.type))+';color:'+(err?'#d08080':ac(d.type))+';';
+  setTimeout(()=>{e.style.display='none';},2800);
+}
+
+function olAdvice(exName){
+  let xt='gym';
+  Object.values(sched).forEach(d=>{if(d.exercises)d.exercises.forEach(e=>{if(e.name===exName)xt=d.type;});});
+  const rel=logs.filter(l=>l.exercise===exName).slice(-6);
+  if(rel.length<2)return null;
+  const last=rel[rel.length-1],prev=rel[rel.length-2];
+  if(xt==='reformer'){
+    const lr=last.sets.reduce((s,x)=>s+x.reps,0),pr=prev.sets.reduce((s,x)=>s+x.reps,0);
+    const ls=Math.max(...last.sets.map(s=>SPRV[s.spring]||0)),ps=Math.max(...prev.sets.map(s=>SPRV[s.spring]||0));
+    if(ls>ps)return{t:'p',m:'Spring load increased. Great progression!'};
+    if(lr>pr)return{t:'p',m:`Reps up by ${lr-pr}. Consider bumping spring next session.`};
+    if(lr===pr&&ls===ps)return{t:'n',m:'Same reps and spring. Try one extra rep or step up the spring.'};
+    return{t:'w',m:'Reps dipped. Focus on form before adding load.'};
+  }
+  const lv=last.sets.reduce((s,x)=>s+x.reps*(x.weight||0),0),pv=prev.sets.reduce((s,x)=>s+x.reps*(x.weight||0),0);
+  const lw=Math.max(...last.sets.map(s=>s.weight||0)),pw=Math.max(...prev.sets.map(s=>s.weight||0));
+  if(lw>pw)return{t:'p',m:`Weight up ${lw-pw} lbs vs last session!`};
+  if(lv>pv)return{t:'p',m:`Volume up ${lv-pv} lbs. Consider adding weight next time.`};
+  if(lv===pv)return{t:'n',m:'Same volume. Try one more rep or a small weight bump.'};
+  return{t:'w',m:'Volume dipped. Check sleep and nutrition.'};
+}
+
+function h(tag,attrs,...ch){
+  const el=document.createElement(tag);
+  if(attrs)Object.entries(attrs).forEach(([k,v])=>{
+    if(k==='style'&&typeof v==='object')Object.assign(el.style,v);
+    else if(k.startsWith('on'))el.addEventListener(k.slice(2).toLowerCase(),v);
+    else el.setAttribute(k,v);
+  });
+  ch.forEach(c=>{if(c==null||c===false)return;if(typeof c==='string'||typeof c==='number')el.appendChild(document.createTextNode(c));else el.appendChild(c);});
+  return el;
+}
+
+function switchTab(t){
+  tab=t;
+  ['today','schedule','history','advice'].forEach(x=>{
+    document.getElementById('tab-'+x).style.display=x===t?'block':'none';
+    const btn=document.querySelector('[data-tab="'+x+'"]');
+    const d=sched[selDay];
+    btn.style.color=x===t?ac(d.type):'#3a3a3a';
+    btn.style.borderBottomColor=x===t?ac(d.type):'transparent';
+  });
+  render(t);updateHdr();
+}
+
+function updateHdr(){
+  const d=sched[selDay];
+  document.getElementById('hdr-title').style.color=ac(d.type);
+  const ex=d.exercises||[];
+  const done=ex.filter(e=>doneEx[e.name]).length;
+  document.getElementById('hdr-right').innerHTML=logs.length+' sessions'+(ex.length>0?'<br><span style="color:'+ac(d.type)+'">'+done+'/'+ex.length+' today</span>':'');
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    if(b.dataset.tab===tab){b.style.color=ac(d.type);b.style.borderBottomColor=ac(d.type);}
+    else{b.style.color='#3a3a3a';b.style.borderBottomColor='transparent';}
+  });
+}
+
+function render(t){
+  const el=document.getElementById('tab-'+t);
+  el.innerHTML='';
+  if(t==='today')rToday(el);
+  if(t==='schedule')rSchedule(el);
+  if(t==='history')rHistory(el);
+  if(t==='advice')rAdvice(el);
+}
+
+// ── TODAY ─────────────────────────────────────────────────────────────────────
+function rToday(root){
+  const day=sched[selDay],isRef=day.type==='reformer',isRest=day.type==='rest';
+  const a=ac(day.type),ad=adb(day.type),ab=abb(day.type);
+
+  // Day strip
+  const strip=h('div',{class:'day-strip'});
+  [1,2,3,4,5,6,0].forEach(d=>{
+    const s=sched[d],isT=d===new Date().getDay(),isSel=d===selDay;
+    const chip=h('div',{class:'day-chip',style:{color:isSel?ac(s.type):'#3a3a3a',background:isSel?(s.type==='reformer'?'#0a1828':s.type==='rest'?'#1a1a1a':'#111a04'):'#111',border:'1px solid '+(isSel?(s.type==='reformer'?'#2a4a70':s.type==='rest'?'#333':'#2a4a10'):'#1a1a1a')}},
+      h('div',{style:{fontSize:'18px',marginBottom:'2px'}},s.emoji),
+      h('div',{style:{fontWeight:'600'}},DN[d].toUpperCase()),
+      ...(isT?[h('div',{style:{width:'4px',height:'4px',background:'#c8f060',borderRadius:'50%',margin:'3px auto 0'}})]:[] )
+    );
+    chip.addEventListener('click',()=>{selDay=d;actSets={};actNotes={};doneEx={};expEx=null;switchTab('today');});
+    strip.appendChild(chip);
+  });
+  root.appendChild(strip);
+
+  // Day card
+  const exs=day.exercises||[];
+  const done=exs.filter(e=>doneEx[e.name]).length;
+  const editBtn=h('button',{style:{fontSize:'11px',color:'#777',background:'#1a1a1a',border:'1px solid #2a2a2a',borderRadius:'7px',padding:'5px 10px',onclick:''}},'✏ Edit');
+  editBtn.addEventListener('click',()=>openEdit(selDay));
+
+  const dayCard=h('div',{style:{background:ad,border:'1px solid '+ab,borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}},
+    h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}},
+      h('div',null,
+        h('div',{style:{fontFamily:"'Space Grotesk',sans-serif",fontSize:'17px',fontWeight:'700',color:a}},day.emoji+' '+day.label),
+        h('div',{style:{fontSize:'11px',color:'#444',marginTop:'2px'}},day.tag)
+      ),editBtn
+    ),
+    h('div',{style:{fontSize:'12px',color:'#555',marginTop:'10px',lineHeight:'1.6'}},day.focus),
+    ...(!isRest&&exs.length>0?[h('div',{style:{marginTop:'12px'}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',fontSize:'10px',color:'#444',marginBottom:'5px'}},h('span',null,'PROGRESS'),h('span',null,Math.round(done/exs.length*100)+'%')),
+      h('div',{style:{background:'#1a1a1a',borderRadius:'4px',height:'3px'}},h('div',{style:{background:a,borderRadius:'4px',height:'3px',width:(done/exs.length*100)+'%',transition:'width .4s'}}))
+    )]:[])
+  );
+  root.appendChild(dayCard);
+
+  if(isRest){root.appendChild(h('div',{style:{textAlign:'center',padding:'50px 20px',color:'#2a2a2a'}},h('div',{style:{fontSize:'48px',marginBottom:'12px'}},day.emoji),h('div',{style:{fontSize:'14px',color:'#3a3a3a'}},'Active Recovery'),h('div',{style:{fontSize:'12px',marginTop:'6px',color:'#252525'}},day.focus)));return;}
+
+  // Warmup
+  if(day.warmup?.length>0){
+    const det=document.createElement('details');
+    det.style.cssText='margin-bottom:14px;border:1px solid '+ab+';border-radius:12px;overflow:hidden';
+    det.appendChild(h('summary',{style:{padding:'12px 16px',background:ad,cursor:'pointer',fontSize:'11px',color:a,letterSpacing:'.1em',textTransform:'uppercase',display:'flex',justifyContent:'space-between'}},h('span',null,'🔥 Warm-Up Protocol'),h('span',{style:{color:'#555'}},'expand')));
+    const wb=h('div',{style:{background:'#0a0a0a',padding:'14px 16px'}});
+    day.warmup.forEach((s,i)=>wb.appendChild(h('div',{style:{display:'flex',gap:'12px',marginBottom:'8px'}},h('span',{style:{color:a,fontSize:'11px',minWidth:'18px'}},String(i+1).padStart(2,'0')),h('span',{style:{fontSize:'12px',color:'#777',lineHeight:'1.5'}},s))));
+    det.appendChild(wb);root.appendChild(det);
+  }
+
+  exs.forEach(ex=>root.appendChild(buildExCard(ex,day)));
+
+  if(done===exs.length&&exs.length>0){
+    root.appendChild(h('div',{style:{textAlign:'center',padding:'22px',background:ad,border:'1px solid '+ab,borderRadius:'12px',marginTop:'12
